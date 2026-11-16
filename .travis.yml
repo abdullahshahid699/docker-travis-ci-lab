@@ -1,0 +1,37 @@
+language: node_js
+
+node_js:
+  - "18"
+
+services:
+  - docker
+
+cache:
+  directories:
+    - node_modules
+
+install:
+  - npm ci
+
+script:
+  # Run application tests
+  - echo "Running Jest tests..."
+  - npm test
+
+  # Build Docker testing stage
+  - echo "Building testing image..."
+  - docker build --target testing -t docker-travis-app:test .
+
+  # Build production image
+  - echo "Building production image..."
+  - docker build --target production -t docker-travis-app:latest .
+
+  # Run production container
+  - docker run -d --name travis-test -p 3000:3000 docker-travis-app:latest
+
+  # Verify application
+  - sleep 5
+  - docker exec travis-test node -e "require('http').get('http://localhost:3000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
+
+  # Cleanup
+  - docker rm -f travis-test
